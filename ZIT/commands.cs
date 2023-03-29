@@ -73,17 +73,19 @@ namespace ConsoleApp
         }
 
         //9
-        public static void do_clone(string lnk) 
-        { 
-            Console.WriteLine("hi"); 
+        public static void do_clone(string param)
+        {
+            //if there are parameters 
+            var lnk = " ";
+            
         }
         //10
-        public static void do_push(string lnk) 
+        public static void do_push(string param) 
         { 
             Console.WriteLine("hi"); 
         }
         //11
-        public static void do_pull(string lnk) 
+        public static void do_pull(string param) 
         { 
             Console.WriteLine("hi"); 
         }
@@ -93,9 +95,12 @@ namespace ConsoleApp
         { 
             Console.WriteLine("hi"); 
         }
+
+        //there are to be 3 parameters that may be or may not be 
         //13
         public static void do_share(string args) 
         { 
+            
             Console.WriteLine("hi"); 
         }
         //14
@@ -157,6 +162,20 @@ namespace ConsoleApp
             }
         }
 
+
+        static string getRepo(string param)
+        {
+            var lnk = " ";
+            if (param != null)
+            {
+                string[] p = param.Split(' ');
+                lnk = p.Length > 1 ? string.Join(" ", param.Skip(1)) : " ";
+                //check
+                if (p[0] != "-r") { Program.warning(3, "clone"); return null; }
+                if (lnk == null) { Console.WriteLine("Zit: please provide a repository with -r"); return; }
+            }
+            if (lnk != " ") { checkRepo(lnk); }
+        }
         static bool checkRepo(string repo) 
         { 
             if(repo!=null) return true; 
