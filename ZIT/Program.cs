@@ -45,13 +45,13 @@ namespace ConsoleApp
                     //if the parameters of the subcommand is right                        
                     else if (IsValidSubCommand(subCommand))
                     {
-                        //miy or may not have parameters
+                        //may or may not have parameters
                         switch (subCommand)
                         {
                             case "clone": { commands.do_clone(parameters); break; }
                             case "pull": { commands.do_pull(parameters); break; }
                             case "push": { commands.do_push(parameters); break; }
-                            default: { warning(3, subCommand); break; }
+                            default: {  break; }//no worning - check in each func
                         }
                         
                         //the no parameters group 
