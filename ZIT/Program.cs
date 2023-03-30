@@ -9,9 +9,10 @@ namespace ConsoleApp
     {
         static void Main(string[] args)
         {
+            Console.WriteLine("Welcom To ZIT:");
             while (true)
             {
-                Console.WriteLine("Welcom To ZIT:");
+                Console.WriteLine("enter your command:");
                 string input = Console.ReadLine();
                 if (input == "quit")
                 {
@@ -34,7 +35,6 @@ namespace ConsoleApp
             var command = args[0];
             var subCommand = args.Length > 1 ? args[1] : null;
             var parameters = args.Length > 2 ? string.Join(" ", args.Skip(2)) : null;
-
             //if the command is right
             if (command == "zit")
             {
