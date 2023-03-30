@@ -150,7 +150,7 @@ namespace ConsoleApp
         {
             string n = null;
             string m = null;
-            string[] flags = ParseParameters(param);
+            string[] flags = Program.ParseParameters(param);
             
             //check the parameters
             if (flags[0] == "m") m = flags[1];
@@ -174,7 +174,7 @@ namespace ConsoleApp
         public static void do_commit(string param)
         {           
             string msg = null;
-            string[] flags = ParseParameters(param);
+            string[] flags = Program.ParseParameters(param);
 
             //check the parameters
             if (flags[0] == "m") msg = flags[1];
@@ -352,22 +352,33 @@ namespace ConsoleApp
 
         //there are to be 3 parameters that may be or may not be 
         //13
-        public static void do_share(string param) 
+        public static void do_share(string args) 
         {
+            permissions(args, 1);
 
+        }
+        //14
+        public static void do_unshare(string args) 
+        {
+            permissions(args, 0);
+        }
+        public static void permissions(string param,int type)
+        {
+            bool allowed = false;
+            string user = getUser();
             string repo = null;
-            string user = null;
+            string account = null;
             string right = null;
-            string[] flags = ParseParameters(param);
+            string[] flags = Program.ParseParameters(param);
 
             //chack parameters
             if (flags[0] == "r")
             {
                 repo = flags[1];
                 if (flags[2] == "u")
-                { 
-                    user = flags[3];
-                    if (flags[4] == "a" && checkRight(flags[5]))right= flags[5];
+                {
+                    account = flags[3];
+                    if (flags[4] == "a" && checkRight(flags[5])) right = flags[5];
                     else if (flags[4] == "0") { Console.WriteLine("Zit: specify a permission"); return; }
                     else { Program.warning(3, "shares"); return; }
                 }
@@ -375,73 +386,45 @@ namespace ConsoleApp
                 else if (flags[2] != "0") { Program.warning(3, "shares"); return; }
             }
             //if there is no repo then its current 
-            else if (flags[0] == "u") 
-            { 
-                repo = getRepo(); user = flags[1];
+            else if (flags[0] == "u")
+            {
+                repo = getRepo(); account = flags[1];
                 if (flags[2] == "a" && checkRight(flags[3])) right = flags[3];
                 else if (flags[2] == "0") { Console.WriteLine("Zit: specify a permission"); return; }
                 else { Program.warning(3, "shares"); return; }
             }
-            
-            
 
-        }
-        //14
-        public static void do_unshare(string args) 
-        {
-            permissions(args,0);
-        }
-        public static void permissions(string param,int type)
-        {
+            //find the user in the user table and find his permissions for the repo 
+            //var user_right
+            //find the account in the user table and find his permisions for the repo
+            //if not exists set to none
+            //var acc_right
+            // if (acc_right!=owner && (user_right == owner)||(user_right == full)) allowed = true;
+            // if (acc_right==owner && user_right == owner) allowed = true;
+            //every other case the user doent have correct permissions to continue
+            //
+            //also check - when unshare if the permission exists to remove
+            //if( type = 0 && acc_right != right ) { Console.WriteLine("Zit: the account does not have this permission to revoke"); return; }
 
+
+            //if( allowed )
+            //{
+            //  if( type = 1) //share
+            //      access the permissions and change it or if not exists create a new entry
+            //  else( type = 0 ) //unshare
+            //  {
+            //      access the permissions and change it or remove entry
+            //  }
+            //}
+            //else Console.WriteLine("Zit: not sufficient  permissions"); return;
         }
         static bool checkRight(string right)
         {
             if (right == "full" || right == "owner" || right == "write" || right == "read") return true;
             return false;
         }
-
-        public static string[] ParseParameters(string param)
-        {
-            string[] flags = { "0", "0", "0", "0", "0", "0" };
-            string[] args = param.Split(new char[] { '-' }, StringSplitOptions.RemoveEmptyEntries);
-            var p1 = args[0];
-            var p2 = args.Length > 1 ? args[1] : null;
-            var p3 = args.Length > 2 ? args[2] : null;
-            Console.WriteLine(p1 + "|" + p2 + "|" + p3);
-
-            if (p1 != null)
-            {
-                string[] s1 = p1.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                flags[0] = s1[0];
-                flags[1] = s1.Length > 1 ? string.Join(" ", s1.Skip(1)) : "0";
-                Console.WriteLine(flags[0] + "|" + flags[1]);
-            }
-
-            if (p2 != null)
-            {
-                string[] s2 = p2.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                flags[2] = s2[0];
-                flags[3] = s2.Length > 1 ? string.Join(" ", s2.Skip(1)) : "0";
-                Console.WriteLine(flags[2] + "|" + flags[3]);
-            }
-
-            if (p3 != null)
-            {
-                string[] s3 = p3.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                flags[4] = s3[0];
-                flags[5] = s3.Length > 1 ? string.Join(" ", s3.Skip(1)) : "0";
-                Console.WriteLine(flags[4] + "|" + flags[5]);
-
-            }
-            return flags;
-        }
-
-        //---------------------------------------------------------
-
         
-        
-
+        //---------------------------------------------------------              
 
         //returnes the current repository
         static string getRepo()
@@ -466,138 +449,5 @@ namespace ConsoleApp
             return false;
         }
 
-
-
-        ////////////////////////////////////////////////////////////////////////////
-        ///failed attemps at prasing::
-        ///the part in the commit      
-        /*
-        //get the message
-        string[] p = param.Split(' ');
-        var msg = p.Length > 1 ? string.Join("", param.Skip(2)) : null;
-            //check
-            if (p[0] != "-m") { Program.warning(3, "tag"); return; }
-            if (msg == null) { Console.WriteLine("Zit: name is reqiered for a commit"); return; }
-            else { msg = msg.TrimStart(' '); }
-            Console.WriteLine("start comit param is |" + p[0] + "|" + msg + "|");
-        */
-        public static void ParseParams(string input, out string msg, out string name, out bool id)
-        {
-            // Initialize the output variables
-            msg = null;
-            name = null;
-            id = false;
-
-            // Split the input string into parts using whitespace as the separator
-            string[] parts = input.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-
-            //the first part of the parameters must be a flag 
-            if (parts[0] == "-a" || parts[0] == "-m")
-            {
-                // Iterate over the parts of the input string
-                for (int i = 0; i < parts.Length; i++)
-                {
-                    // Check if the current part is the -m option
-                    if (parts[i] == "-m" && i < parts.Length - 1)
-                    {
-                        i++;
-                        // Set the msg variable to the next part of the input string
-                        while (parts[i] != "-a" && i < parts.Length)
-                        {
-                            msg += (parts[i]);
-                            msg += " ";
-                            if (i < parts.Length - 1) i++; else break;
-                        }
-                        i--;
-                    }
-                    // Check if the current part is the -a option
-                    else if (parts[i] == "-a" && i < parts.Length - 1)
-                    {
-                        i++;
-                        // Set the name variable to the next part of the input string
-                        while (parts[i] != "-m" && i < parts.Length)
-                        {
-                            name += parts[i];
-                            name += " ";
-                            if (i < parts.Length - 1) i++; else break;
-                        }
-                        i--;
-                    }
-                }
-                if (msg != null || name != null) id = true;
-            }
-            else Program.warning(3, "tag");
-
-        }
-        //a function that parses the 3 arguments for the share commands
-        static string[] args(string input)
-        {
-            // Split input string by the -> delimiter
-            string[] inputParts = input.Split(new string[] { "->" }, StringSplitOptions.None);
-
-            // Extract up to three arguments: repo, user, right
-            string repo = null;
-            string user = null;
-            string right = null;
-
-            if (inputParts.Length >= 1)
-            {
-                repo = inputParts[0].Trim();
-            }
-
-            if (inputParts.Length >= 2)
-            {
-                user = inputParts[1].Trim();
-            }
-
-            if (inputParts.Length >= 3)
-            {
-                right = inputParts[2].Trim();
-            }
-
-            // Print each argument on a separate line
-            Console.WriteLine("Repo: " + (repo ?? "none"));
-            Console.WriteLine("User: " + (user ?? "none"));
-            Console.WriteLine("Right: " + (right ?? "none"));
-            string[] arg = { null, null, null };
-            //check if the first argument is a repo
-            if (checkRepo(inputParts[0]))
-                //set it to be sent back
-                arg[0] = inputParts[0];
-            else
-            {
-                //set the repo as current 
-                arg[0] = getRepo();
-                //and check if the first argument is a user 
-                if (checkUser(inputParts[0]))
-                    //set it to be sent back
-                    arg[1] = inputParts[0];
-                else
-                {
-                    //if its not a user and not a repo that its a wrong argument
-                    //client must specify repo - user - right but may ommit the repo 
-
-                }
-            }
-            //else 
-            //if it is put it in the 
-            return inputParts;
-        }
-        //finds and returnes a repository entry
-        static string findRepo(string param)
-        {
-            return "hi";
-            /*
-            var lnk = " ";
-            if (param != null)
-            {
-                string[] p = param.Split(' ');
-                lnk = p.Length > 1 ? string.Join(" ", param.Skip(1)) : " ";
-                //check
-                if (p[0] != "-r") { Program.warning(3, "clone"); return null; }
-                if (lnk == null) { Console.WriteLine("Zit: please provide a repository with -r"); return; }
-            }
-            if (lnk != " ") { checkRepo(lnk); }*/
-        }
     }
 }
