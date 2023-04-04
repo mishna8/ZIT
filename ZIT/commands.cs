@@ -9,24 +9,39 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using System.Data.SqlClient;
 
 namespace ConsoleApp
 {
     internal class commands
     {
+        //all the sources of data:
         // Get the current working directory
         public static string workingDirectory = Directory.GetCurrentDirectory();
+        
         // Initialize the staging area
         public static List<FileInfo> stagedFiles = new List<FileInfo>();
-        // a list of all the files exists in one place and not the other to prepare for pull/push
+        // the commit history is a list in every repository
+        // the repository reg
+        public static List<Repository> RepoDB = new List<Repository>();
+
+        // conflict resolution checking list 
         public static List<FileInfo> dif = new List<FileInfo>();
 
         //1
         public static void do_init()
         {
-            //??????what if already exists????
-            // Create a new directory called ".zit"
+            // check if already exists, for zit write a worning
+            /* Git reinitialize the repository. the existing Git history, 
+             * including all previous commits and branches, will be erased. 
+             */
             string zitDirectoryPath = Path.Combine(workingDirectory, ".zit");
+            if (Directory.Exists(zitDirectoryPath))
+            {
+                Console.WriteLine("Zit: a zit repository is already initialized in this directory");
+                return; 
+            }
+            //create the directory
             Directory.CreateDirectory(zitDirectoryPath);
 
             // Create subdirectories inside the .zit directory
@@ -41,28 +56,73 @@ namespace ConsoleApp
             string headFilePath = Path.Combine(zitDirectoryPath, "HEAD");
             File.Create(headFilePath);
 
-            //??????head is file?????????
-
             Console.WriteLine("Initialized empty Zit repository in " + zitDirectoryPath);
-            
-            //add the repo to the repo reg with the creator user as owner
+
+            // create the new repo 
+            User creator = getUser();
+            Repository newRepo = new Repository(zitDirectoryPath, creator);
+
+            //add the repo to the repo list
+            RepoDB.Add(newRepo);
         }
+
+        // get the value of the commit written as current in the head file
+        public static string GetHead()
+        {
+            string value = null;
+            //get the .zit directory
+            string zitDirectoryPath = Path.Combine(workingDirectory, ".zit");
+            //get the head file from this directory
+            string headFilePath = Path.Combine(zitDirectoryPath, "HEAD");
+            try
+            {
+                using (StreamReader sr = new StreamReader(headFilePath))
+                {
+                    value = sr.ReadLine();
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error reading file: " + e.Message);
+            }
+
+            return value;
+        }
+        // update the head file value to be the new commit
+        public static void SetHead(string newReference)
+        {
+            //get the .zit directory
+            string zitDirectoryPath = Path.Combine(workingDirectory, ".zit");
+            //get the head file from this directory
+            string headFilePath = Path.Combine(zitDirectoryPath, "HEAD");
+            try
+            {
+                using (StreamWriter sw = new StreamWriter(headFilePath))
+                {
+                    sw.WriteLine(newReference);
+                }
+            }   
+            catch (Exception e)
+            {
+                Console.WriteLine("Error updating HEAD reference: " + e.Message);
+             }
+        }
+
 
         //2
         public static void do_log()
         {
             //access the current repo
-            string repo = getRepo();
+            Repository repo = getRepo();
             //access the commit table for this repo
             Console.WriteLine("Commit History :");
-            //foreach (commit commitEntry in the commits group of th reg )
-            //{
-            //make a string of it 
-            //string commitString = ToString(commitEntry);
-            //Console.WriteLine(commitString);
-            //}
+            foreach (Commit commitEntry in repo.CommitHistory)
+            {
+              Commit.WriteComit(commitEntry);        
+            }
         }
 
+        //---------------------------------------------------------------
         //3
         public static void do_status()
         {
@@ -82,12 +142,9 @@ namespace ConsoleApp
             }
         }
 
-        //-------------------------------------------------
         //4
         public static void do_add()
         {
-            Console.WriteLine("started zit add");
-
             // Get all files in the working directory
             string[] files = Directory.GetFiles(workingDirectory);
             // Stage each file
@@ -96,10 +153,8 @@ namespace ConsoleApp
                 StageFile(file);
             }
 
-            Console.WriteLine("returned to zit add");
-
             // Remove for debug 
-            //EmptyStagedFiles();
+           //EmptyStagedFiles();
             //UnstageFile("");
 
         }
@@ -121,8 +176,7 @@ namespace ConsoleApp
         }
         static void UnstageFile(string fileName)
         {
-            // Check if the file is not staged
-            
+            // Check if the file is not staged           
             foreach (FileInfo file in stagedFiles)
             {
                 if (file.Name == fileName)
@@ -135,7 +189,6 @@ namespace ConsoleApp
             }
             //if we passed all the files it it didnt return it wasnt there
             Console.WriteLine(fileName + " is not staged , failed to unstage");
-
         }
         public static void EmptyStagedFiles()
         {
@@ -162,12 +215,26 @@ namespace ConsoleApp
             else if (flags[2] != "0") { Program.warning(3, "tag"); return; }
             if (flags[4] != "0" && flags[5] != "0") { Program.warning(3, "tag"); return; }
 
-            //do the tag 
+
             //get the commit needed to tag - the one checkedout
             Commit com = getCurCommit();
             //create the tag
             Tag t = new Tag(n, m);
-            com.Tags = t;
+            // there is only one commit for a tag check if this tag is available
+            //get the repo 
+            Repository repo = getRepo();
+            if (repo.tagedCommits.ContainsKey(t))
+            {
+                Commit commit = repo.tagedCommits[t];
+                Console.WriteLine("Zit: tag is already asigned to " + commit);
+            }
+            else
+            {
+                // there are many tags to a commit, so we add it to the list 
+                com.Tags.Add(t);
+                repo.tagedCommits.Add(t, com);
+                Console.WriteLine("Zit: tag successfully asigned to " + com);
+            }          
         }
 
         //6
@@ -176,24 +243,17 @@ namespace ConsoleApp
             string msg = null;
             string[] flags = Program.ParseParameters(param);
 
-            //check the parameters
+            //check the message
             if (flags[0] == "m") msg = flags[1];
             else if (flags[0] == "0") { Console.WriteLine("Zit: a message is reqiered for commit"); return; }
             else { Program.warning(3, "commit"); return; }
             if (flags[2] != "0" || flags[3] != "0" || flags[4] != "0" || flags[5] != "0") { Program.warning(3, "commit"); return; }
-            Console.WriteLine("start comit param is |" + flags[0] + "|" + msg + "|");
-            
             //get the author
-            string auther = getUser();
-            Console.WriteLine(" auther is " + auther);
+            User auther = getUser();
 
-            //create a new objects for the commit 
-            Dictionary<string, string> FileSnapshot = new Dictionary<string, string>();
-            Tag t = new Tag(null, null);
             // Create a new commit object
-            Commit commit = new Commit(auther, msg, t, FileSnapshot);
-            Console.WriteLine("here1");
-
+            Commit commit = new Commit(auther, msg);
+            
             // Create a snapshot of each file and add it to the commit object
             foreach (FileInfo file in stagedFiles)
             {
@@ -204,8 +264,14 @@ namespace ConsoleApp
                 string fileHash = GetHashString(fileContent);
                 commit.Snapshot.Add(file.Name, fileHash);
             }
-            //add the commit to the repo history
 
+            //set the new commit as the last and current
+            SetHead(commit.Hash);
+            Commit.WriteComit(commit);
+
+            //add the commit to the repo history
+            Repository repo = getRepo();
+            repo.CommitHistory.Add(commit);
 
             //clear the staging area to the next modification?
             /*foreach (FileInfo file in stagedFiles)
@@ -226,86 +292,99 @@ namespace ConsoleApp
         //7
         public static void do_revert(string param) 
         {
-            //get the commit hash number 
+           //find the commit we revert to 
+           if (param == null) { Console.WriteLine("Zit: a commit reference is requierd"); return; }
            Commit com = getCommitHash(param);
-            //create the new reverted commit
+           //check if the commit is valid
+
+
+           //create the new reverted commit
+           //will only copy the data details, but with unique system details like time & hash
            Commit revCom = Commit.createCommit(com);
+
+            //set the new commit as the last and current
+            SetHead(revCom.Hash);
+            Commit.WriteComit(revCom);
+
             //add the commit to the repo history
+            Repository repo = getRepo();
+            repo.CommitHistory.Add(revCom);
         }
         //8
         public static void do_checkout(string param)
         {
-            //get the commit hash number 
+            //find the commit to checkout
+            if (param == null) { Console.WriteLine("Zit: a commit reference is requierd"); return; }
             Commit com = getCommitHash(param);
-            //move the head 
+            //check if the commit is valid
+            //if (com.Author == "system_nullCommit") { Console.WriteLine("Zit: could not find your commit"); return; }
+            
+            //set the new commit as the last and current
+            SetHead(com.Hash);
+            Commit.WriteComit(com);
 
         }
 
         //-------------------------------------------------------------------
-        //returns the current commit that is being checkedout
+        //returns the current commit that is on head
         static Commit getCurCommit()
         {
-            Dictionary<string, string> FileSnapshot = new Dictionary<string, string>();
-            Tag t = new Tag(null, null);
-            Commit commit1 = new Commit("a", "m", t, FileSnapshot);
-            return commit1;
+            string h = GetHead();
+            Commit com = getCommitHash(h);
+            return com;
         }
+        //returns the commit that is requested 
         static Commit getCommitHash(string param)
         {
+            Console.WriteLine("|" + param + "|");
+            Commit com;
+
             //get the reference
-            string[] p = param.Split(' ');
-            var c = p.Length > 1 ? string.Join(" ", param.Skip(1)) : null;
-            //check
-            if (c == null) { Console.WriteLine("Zit: please specify another commit"); return null; }
-            /*
-            //find it and return it
-            //look for the hash in the commit table
-            if (p[0] == "-n")
+            string firstFourChars = param.Substring(0, 4);
+            //if its a ref relatred to head
+            if (firstFourChars == "head")
             {
+                char Char = param[5]; 
+                int n = Int32.Parse(Char.ToString()); 
+                Console.WriteLine(n); 
 
             }
-            //look for the tag in the tag table and get its hash
-            else if (p[0] == "-t")
+            //else its a tag or a hash, so access the history and search
+            else if (true)
             {
-
-            }
-            //isolate the number from the string and go back 
-            else if (p[0] == "-h")
-            {
-                var x = getNum(c);
-                if (x == -1) return null;
-                for (int i = 0; i <= x; i++)
+                if (true)
                 {
-
+                    Console.WriteLine("this is your commit by tag");
+                    /*foreach (tag  in db)
+                    {
+                        if (tag == param)
+                        { 
+                            Commit c = createCommit( get the commit of this tag ) ; 
+                            return c;
+                        }
+                    }*/
+                }
+                //if we passed all the tags and none matches then check tags
+                else
+                {
+                    Console.WriteLine("this is your commit by hash");
+                    /*foreach (hash  in the hash db)
+                   {
+                       if (hash == param)
+                       {
+                           Commit c = createCommit( get the commit of this tag );
+                           return c;
+                       }
+                   }*/
                 }
             }
-            else { Program.warning(3, "tag"); return null; }
-            */
-            Dictionary<string, string> FileSnapshot = new Dictionary<string, string>();
-            Tag t = new Tag(null, null);
-            Commit commit1 = new Commit("a", "m", t, FileSnapshot);
-            return commit1;
+            //else if it doesnt exist then its a wrong parameter
+            else { Program.warning(3, "commit"); }
+
+                      
+            return com;
         }
-        static int getNum(string input)
-        {
-            //find the number
-            string[] parts = input.Split('~');
-            string num = parts[1];
-
-            // parse the number string as an integer
-            if (int.TryParse(num, out int x))
-            {
-                // Return the extracted number 
-                return x;
-            }
-            else
-            {
-                Console.WriteLine("Zit: not a correct reference.");
-                return -1;
-            }
-        }
-
-
+       
         //####################################################################
 
 
@@ -324,6 +403,17 @@ namespace ConsoleApp
             //check for conflicts
             //access specified remote repo's commit histroy table
             //sql compare??
+            
+            
+        }
+        //11
+        public static void do_pull(string param) 
+        { 
+            Console.WriteLine("hi"); 
+        }
+        public static bool checkConflict()
+        {
+            bool conflict = false;
             //foreach file in local commit history
             //if not exists in remote commit history
             //FileInfo file = new FileInfo(fileName);
@@ -334,23 +424,52 @@ namespace ConsoleApp
             //extra - conflict resolution :
             //no conflict - 
             // Check if the file is already staged
-            
-        }
-        //11
-        public static void do_pull(string param) 
-        { 
-            Console.WriteLine("hi"); 
+            return conflict;
         }
         
         //-----------------------------------------------------------
         //12
         public static void do_getall() 
         {
-            string who = getUser();
-            //access the user db search the user and print all repo found 
+            User u = getUser();
+            List<Repository> yourRepo = new List<Repository>();
+
+            foreach (Repository r in RepoDB)
+            {
+                if (r.usersRight.ContainsKey(u))
+                {
+                    yourRepo.Add(r);
+                    Console.WriteLine("ID: " + r.ID);
+                    Console.WriteLine("path: " + r.path);
+                    Console.WriteLine("     ");
+                }
+            }
         }
 
-        //there are to be 3 parameters that may be or may not be 
+        /*public static List<string> FindRepositoriesByUser(string connectionString, string user)
+        {
+            var repositories = new List<string>();
+
+            using (var connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+
+                var command = new SqlCommand($"SELECT Name FROM Repositories WHERE Users LIKE '%{user}%'", connection);
+
+                var reader = command.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    repositories.Add(reader["Name"].ToString());
+                }
+
+                reader.Close();
+            }
+
+            return repositories;
+        }
+        */
+
         //13
         public static void do_share(string args) 
         {
@@ -364,20 +483,29 @@ namespace ConsoleApp
         }
         public static void permissions(string param,int type)
         {
-            bool allowed = false;
-            string user = getUser();
-            string repo = null;
-            string account = null;
-            string right = null;
+            bool exists = false;
+            Repository repo = null;
+            string who = null;
+            string right = "none";
             string[] flags = Program.ParseParameters(param);
 
             //chack parameters
+            //first we get a repo
             if (flags[0] == "r")
-            {
-                repo = flags[1];
+            {                
+                //check the repository 
+                foreach (Repository r in RepoDB)
+                {
+                    if (r.ID == flags[1])
+                    {
+                        exists = true;
+                        repo = r; break;
+                    }
+                }
+                if (exists == false) {Console.WriteLine("Zit: the repository doesnt exists"); return; }
                 if (flags[2] == "u")
                 {
-                    account = flags[3];
+                    who = flags[3];
                     if (flags[4] == "a" && checkRight(flags[5])) right = flags[5];
                     else if (flags[4] == "0") { Console.WriteLine("Zit: specify a permission"); return; }
                     else { Program.warning(3, "shares"); return; }
@@ -385,38 +513,50 @@ namespace ConsoleApp
                 else if (flags[2] == "0") { Console.WriteLine("Zit: a user is reqiered for permission managment"); return; }
                 else if (flags[2] != "0") { Program.warning(3, "shares"); return; }
             }
-            //if there is no repo then its current 
+            //if there is no repo then its the current repo
             else if (flags[0] == "u")
             {
-                repo = getRepo(); account = flags[1];
+                repo = getRepo(); who = flags[1];
                 if (flags[2] == "a" && checkRight(flags[3])) right = flags[3];
                 else if (flags[2] == "0") { Console.WriteLine("Zit: specify a permission"); return; }
                 else { Program.warning(3, "shares"); return; }
             }
+            else { Program.warning(3, "shares"); return; }
 
-            //find the user in the user table and find his permissions for the repo 
-            //var user_right
-            //find the account in the user table and find his permisions for the repo
-            //if not exists set to none
-            //var acc_right
-            // if (acc_right!=owner && (user_right == owner)||(user_right == full)) allowed = true;
-            // if (acc_right==owner && user_right == owner) allowed = true;
-            //every other case the user doent have correct permissions to continue
-            //
+            bool allowed = false;
+            User user = getUser();
+            string user_right = null;
+            User account;
+            string acc_right = "none";
+            //find the user's permissions for the repo
+            if (repo.usersRight.ContainsKey(user))
+            {
+                user_right = repo.usersRight[user];
+            }
+            //find the account's permissions 
+            foreach (var ac in repo.usersRight)
+            {
+                if (ac.Key.Name == who)
+                {
+                    account = ac.Key;
+                    acc_right = acc.Value; break;
+                }
+            }
+            //the only cses where the permisssions are sufficient to change them
+            if (acc_right!="owner" && (user_right == "owner" || user_right == "full")) allowed = true;
+            if (acc_right=="owner" && user_right == "owner") allowed = true;          
             //also check - when unshare if the permission exists to remove
-            //if( type = 0 && acc_right != right ) { Console.WriteLine("Zit: the account does not have this permission to revoke"); return; }
-
-
-            //if( allowed )
-            //{
-            //  if( type = 1) //share
-            //      access the permissions and change it or if not exists create a new entry
-            //  else( type = 0 ) //unshare
-            //  {
-            //      access the permissions and change it or remove entry
-            //  }
-            //}
-            //else Console.WriteLine("Zit: not sufficient  permissions"); return;
+            if( (type == 0) && (acc_right != right) ) { Console.WriteLine("Zit: the account does not have this permission to revoke"); return; }
+            if( allowed )
+            {
+              if( type == 1) //share
+                    repo.usersRight[account]=right;
+              else ( type == 0 ) //unshare
+              {
+                //      access the permissions and change it or remove entry
+              }
+            }
+            else { Console.WriteLine("Zit: not sufficient permissions"); return;}
         }
         static bool checkRight(string right)
         {
@@ -427,20 +567,19 @@ namespace ConsoleApp
         //---------------------------------------------------------              
 
         //returnes the current repository
-        static string getRepo()
+        static Repository getRepo()
         {
-            return "hi";
-        }
-        //checks if a repository entry is correct and exists
-        static bool checkRepo(string repo) 
-        { 
-            if(repo=="repo") return true; 
-            return false;
-        }
+            User u = new User("a", "b", "c");
+            Repository r = new Repository(workingDirectory, u);
+            return r;
+        }        
+
+
         //returnes the current user
-        static string getUser() 
-        { 
-            return "me"; 
+        static User getUser() 
+        {
+            User u = new User("a", "b", "c");
+            return u; 
         }
         //checks if a user entry is correct and exists
         static bool checkUser(string user)

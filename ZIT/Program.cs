@@ -163,14 +163,14 @@ namespace ConsoleApp
             var p1 = args[0];
             var p2 = args.Length > 1 ? args[1] : null;
             var p3 = args.Length > 2 ? args[2] : null;
-            Console.WriteLine(p1 + "|" + p2 + "|" + p3);
+            //Console.WriteLine(p1 + "|" + p2 + "|" + p3);
 
             if (p1 != null)
             {
                 string[] s1 = p1.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 flags[0] = s1[0];
                 flags[1] = s1.Length > 1 ? string.Join(" ", s1.Skip(1)) : "0";
-                Console.WriteLine(flags[0] + "|" + flags[1]);
+                //Console.WriteLine(flags[0] + "|" + flags[1]);
             }
 
             if (p2 != null)
@@ -178,7 +178,7 @@ namespace ConsoleApp
                 string[] s2 = p2.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 flags[2] = s2[0];
                 flags[3] = s2.Length > 1 ? string.Join(" ", s2.Skip(1)) : "0";
-                Console.WriteLine(flags[2] + "|" + flags[3]);
+                //Console.WriteLine(flags[2] + "|" + flags[3]);
             }
 
             if (p3 != null)
@@ -186,7 +186,7 @@ namespace ConsoleApp
                 string[] s3 = p3.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 flags[4] = s3[0];
                 flags[5] = s3.Length > 1 ? string.Join(" ", s3.Skip(1)) : "0";
-                Console.WriteLine(flags[4] + "|" + flags[5]);
+                //Console.WriteLine(flags[4] + "|" + flags[5]);
 
             }
             return flags;
