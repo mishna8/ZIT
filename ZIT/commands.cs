@@ -336,8 +336,8 @@ namespace ConsoleApp
         //returns the commit that is requested 
         static Commit getCommitHash(string param)
         {
-            Console.WriteLine("|" + param + "|");
-            Commit com;
+            Repository repo = getRepo();
+            Commit com = null;
 
             //get the reference
             string firstFourChars = param.Substring(0, 4);
@@ -346,45 +346,43 @@ namespace ConsoleApp
             {
                 char Char = param[5]; 
                 int n = Int32.Parse(Char.ToString()); 
-                Console.WriteLine(n); 
-
+                return getParent(n);
             }
             //else its a tag or a hash, so access the history and search
-            else if (true)
+            else 
             {
-                if (true)
+                foreach (var tagedCom  in repo.tagedCommits)
                 {
-                    Console.WriteLine("this is your commit by tag");
-                    /*foreach (tag  in db)
-                    {
-                        if (tag == param)
-                        { 
-                            Commit c = createCommit( get the commit of this tag ) ; 
-                            return c;
-                        }
-                    }*/
+                    if (tagedCom.Key.Name == param)
+                    {                        
+                        Console.WriteLine("this is your commit by tag");
+                        return tagedCom.Value;
+                    }
                 }
+
                 //if we passed all the tags and none matches then check tags
-                else
+                foreach (var c in repo.CommitHistory)
                 {
-                    Console.WriteLine("this is your commit by hash");
-                    /*foreach (hash  in the hash db)
-                   {
-                       if (hash == param)
-                       {
-                           Commit c = createCommit( get the commit of this tag );
-                           return c;
-                       }
-                   }*/
-                }
+                    if (c.Hash == param)
+                    {
+                        Console.WriteLine("this is your commit by hash");
+                        return c;
+                    }
+                }                
             }
             //else if it doesnt exist then its a wrong parameter
-            else { Program.warning(3, "commit"); }
-
-                      
+             Program.warning(3, "commit"); 
+                     
             return com;
         }
-       
+        //recives a number x and moves x commit up the branch to the ancesstor commit
+        static Commit getParent(int x)
+        {
+            User u = getUser();
+            Commit c = new Commit(u, "b");
+            return c;
+        }
+
         //####################################################################
 
 
@@ -393,18 +391,28 @@ namespace ConsoleApp
         public static void do_clone(string param)
         {
             //if there are parameters 
-            var lnk = " ";
-            
+             Repository r = checkRepo(param);
+            Repository local = getRepo();
+            // check if the remote repository returned a value
+            if (local == r) { Console.WriteLine("Zit: didnt find your repository"); return; }
+            foreach(var commit in r.CommitHistory)
+            {
+                local.CommitHistory.Add(commit);
+            }
         }
         //10
         public static void do_push(string param) 
-        { 
-            Console.WriteLine("hi");
-            //check for conflicts
-            //access specified remote repo's commit histroy table
-            //sql compare??
-            
-            
+        {
+            //if there are parameters 
+            Repository r = checkRepo(param);
+            Repository local = getRepo();
+            // check if the remote repository returned a value
+            if (local == r) { Console.WriteLine("Zit: didnt find your repository"); return; }
+            foreach (var commit in dif)
+            {
+                local.CommitHistory.Add(commit);
+            }
+
         }
         //11
         public static void do_pull(string param) 
@@ -523,40 +531,46 @@ namespace ConsoleApp
             }
             else { Program.warning(3, "shares"); return; }
 
-            bool allowed = false;
+            //-----------------------------------------------------
+
             User user = getUser();
-            string user_right = null;
-            User account;
-            string acc_right = "none";
+            string user_right = "none";            
             //find the user's permissions for the repo
             if (repo.usersRight.ContainsKey(user))
             {
                 user_right = repo.usersRight[user];
             }
+            //check for general permissions
+            if(user_right != "owner" && user_right != "full") { Console.WriteLine("Zit: not sufficient permissions"); return; }
             //find the account's permissions 
             foreach (var ac in repo.usersRight)
             {
                 if (ac.Key.Name == who)
                 {
-                    account = ac.Key;
-                    acc_right = acc.Value; break;
+                    // check for correct permissions and set the new value 
+                    if ((ac.Value == "owner" && user_right == "owner") || ac.Value != "owner")
+                    {
+                        if (type == 1) //share
+                            // that means the account has some level and we just change it
+                            repo.usersRight[ac.Key] = right;
+                        else
+                        {
+                            if (type == 0 && (ac.Value == right))
+                                // we whant to revoke the level given
+                                repo.usersRight.Remove(ac.Key);
+                            else if ((ac.Value != right)) { Console.WriteLine("Zit: the account does not have this permission to revoke"); return; }
+                        }
+                    }
+                    else { Console.WriteLine("Zit: not sufficient permissions"); return; }
+                    return;
                 }
             }
-            //the only cses where the permisssions are sufficient to change them
-            if (acc_right!="owner" && (user_right == "owner" || user_right == "full")) allowed = true;
-            if (acc_right=="owner" && user_right == "owner") allowed = true;          
-            //also check - when unshare if the permission exists to remove
-            if( (type == 0) && (acc_right != right) ) { Console.WriteLine("Zit: the account does not have this permission to revoke"); return; }
-            if( allowed )
-            {
-              if( type == 1) //share
-                    repo.usersRight[account]=right;
-              else ( type == 0 ) //unshare
-              {
-                //      access the permissions and change it or remove entry
-              }
-            }
-            else { Console.WriteLine("Zit: not sufficient permissions"); return;}
+            //if we reached here the account does not have an entry          
+            if( type == 1) //share - create an entry
+                repo.usersRight.Add(checkUser(who),right);
+            else if( type == 0 ) //unshare
+            { Console.WriteLine("Zit: the account does not have this permission to revoke"); return; }
+
         }
         static bool checkRight(string right)
         {
@@ -572,8 +586,19 @@ namespace ConsoleApp
             User u = new User("a", "b", "c");
             Repository r = new Repository(workingDirectory, u);
             return r;
-        }        
-
+        }
+        static Repository checkRepo(string where)
+        {
+            Repository r = getRepo();
+            foreach (var r in RepoDB)
+            {
+                if (r.ID == where)
+                {
+                    return r;
+                }
+            }
+            return r;
+        }
 
         //returnes the current user
         static User getUser() 
@@ -581,11 +606,19 @@ namespace ConsoleApp
             User u = new User("a", "b", "c");
             return u; 
         }
-        //checks if a user entry is correct and exists
-        static bool checkUser(string user)
+        //checks if a user entry is correct and exists and returns it
+        static User checkUser(string who)
         {
-            if (user == "user") return true;
-            return false;
+            Repository repo  = getRepo();
+            User u = null;
+            foreach (var ac in repo.usersRight)
+            {
+                if (ac.Key.Name == who)
+                {
+                    return ac.Key;
+                }
+            }
+            return u;
         }
 
     }

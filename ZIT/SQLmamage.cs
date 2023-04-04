@@ -7,7 +7,7 @@ using System.Data.SqlClient;
 
 namespace ConsoleApp
 {
-    
+    // testing file for connecting to a sql server 
 
     /*
     public class DatabaseHelper

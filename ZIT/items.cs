@@ -39,45 +39,7 @@ namespace ConsoleApp
             this.CommitHistory = new List<Commit>();
 
         }
-        
-
-        /*
-
-        private readonly string path;
-        private readonly CredentialsHandler credentialsHandler;
-
-        public Repository(string path, string username, string password)
-        {
-            this.path = path;
-
-            // Set up the credentials handler for authentication
-            credentialsHandler = (_url, _user, _cred) =>
-                new UsernamePasswordCredentials()
-                {
-                    Username = username,
-                    Password = password
-                };
-        }
-
-        public void PushChanges()
-        {
-            var repo = new Repository(path)
-            
-                // Stage changes
-                Commands.Stage(repo, "*");
-
-                // Create new commit
-                var author = new Signature("Your Name", "your.email@example.com", DateTimeOffset.Now);
-                var committer = author;
-                repo.Commit("Commit message", author, committer);
-
-                // Push changes to remote repository
-                var remote = repo.Network.Remotes["origin"];
-                var options = new PushOptions();
-                options.CredentialsProvider = credentialsHandler;
-                repo.Network.Push(remote, @"refs/heads/main", options);
-            
-        }*/
+      
     }
 
     public class User
